@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/cc -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/Lab2.dir/main.c.o CMakeFiles/Lab2.dir/testing_sketches/imageCaptureSketch/optfft.c.o CMakeFiles/Lab2.dir/testing_sketches/imageCaptureSketch/tables.c.o  -o Lab2 
