@@ -92,6 +92,12 @@ char LAST_SOLAR_PANEL_CONTROL_CHAR = NO_SOLAR_PANEL_INPUT;
 
 const char ACKNOWLEDGEOVERTEMP_CHAR = 'A';
 
+//Command/Response inputs
+const char START_MODE = 'S';
+const char STOP_MODE = 'P';
+const char DISPLAY_MODE = 'D';
+const char TRANSMIT_THRUST = 'T';
+const char MSG_COMMAND = 'M';
 
 //To mining vehicle
 const char FORWARD_CHAR = 'F';
@@ -285,6 +291,11 @@ struct VehicleCommsDataStruct {
 };
 typedef struct VehicleCommsDataStruct VehicleCommsData;
 
+struct CommandManagementDataStruct {
+    //............
+};
+typedef struct CommandManagementDataStruct CommandManagementData;
+
 struct ConsoleDisplayDataStruct {
     Bool *fuelLow;
     Bool *batteryLow;
@@ -340,6 +351,9 @@ void thrusterSubsystemTask(void *thrusterSubsystemData);
 
 //Controls the execution of the satellite coms subsystem
 void satelliteComsTask(void *satelliteComsData);
+
+//Controls the exeuction of the Command Task subsystem
+void commandManagementTask(void *commandManagementData);
 
 //Controls the execution of the console display subsystem
 void consoleDisplayTask(void *consoleDisplayData);
@@ -632,6 +646,10 @@ void setupSystem() {
 
     insertNode(&satelliteComsTCB);
 
+    //Command Management Subsystem
+    CommandManagementData commandManagementData;
+    //.....
+    //.....
 
     //Console Display
     ConsoleDisplayData consoleDisplayData;
@@ -726,6 +744,7 @@ void setupSystem() {
     transportDistanceTCB.next = NULL;
     transportDistanceTCB.prev = NULL;
     transportDistanceTCB.priority = 1;
+
 
 
     //Starts the schedule looping
@@ -1055,19 +1074,38 @@ void satelliteComsTask(void *satelliteComsData) {
         lastExecutionTime = systemTime();
         SatelliteComsData *data = (SatelliteComsData *) satelliteComsData;
 
-        //TODO: In future labs, send the following data:
-        /*
-        * Fuel Low
-        * Battery Low
-        * Solar Panel State
-        * Battery Level
-        * Fuel Level
-        * Power Consumption
-        * Power Generation
-        */
-
         *(data->thrusterControl) = getRandomThrustSignal();
         nextExecutionTime = systemTime() + runDelay;
+    }
+}
+
+void commandManagementTask(void *commandManagementData) {
+    //.....
+    static unsigned long nextExecutionTime = 0;
+    static unsigned long lastExecutionTime = 0;
+    if (nextExecutionTime == 0 || nextExecutionTime < systemTime()) {
+#if !ARDUINO_ON && DEBUG
+        printf("commandManagementTask\n");
+#endif
+        printTaskTiming("commandManagementTask", lastExecutionTime);
+        lastExecutionTime = systemTime();
+        CommandManagementData *data = (CommandManagementData *) commandManagementData;
+
+        //Verifies whether command is valid:
+            //Valid: Acted Upon
+                /*
+                S - Start : Directs hardware to enable all measurement Tasks & enables all interrupts
+                P - Stop: Terminates any measurement tasks,     Disables data collecting interrupts
+                D - Dispaly: Enable / Disable Display
+                T - Transmit thrust command to Satellite
+                M - Command / Rponse of most recent values of data
+                A - Achknowledges the receipt of identified command
+                
+            //Else: Send Error to Sattelite Comms Task for Transmission
+                E - Error: invalid input
+                */
+        //Removes CommandTask
+
     }
 }
 
