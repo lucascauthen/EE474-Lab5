@@ -5,7 +5,7 @@
 //Technical support:goodtft@163.com
 
 #define ARDUINO_ON 1
-#define DEBUG 1
+#define DEBUG 0
 
 #if ARDUINO_ON
 
@@ -82,9 +82,6 @@ enum myBool {
 typedef enum myBool Bool;
 #endif
 
-
-const int PWM_OUTPUT_PIN = 23;
-
 const char INC_CHAR = '1';
 const char DEC_CHAR = '-';
 const char NO_SOLAR_PANEL_INPUT = '0';
@@ -98,7 +95,7 @@ const char FORWARD_CHAR = 'F';
 const char BACK_CHAR = 'B';
 const char LEFT_CHAR = 'L';
 const char RIGHT_CHAR = 'R';
-const char DRILL_START_CHAR = 'D';
+const char DRILL_START_CHAR = 'E';
 const char DRILL_STOP_CHAR = 'H';
 
 const char OK_LIFT_OFF = 'K';
@@ -108,9 +105,28 @@ const char NO_VEHICLE_COMMAND = '/';
 char LAST_VEHICLE_COMM = NO_VEHICLE_COMMAND;
 
 //From mining vehicle
-const char REQUEST_TRANSPORT = 'T';
-const char REQUEST_DOCK = 'D';
+const char REQUEST_TRANSPORT = 'V';
+const char REQUEST_DOCK = 'G';
 const char RESPONSE_END = '>';
+
+//Internal commands
+const char PIRATE_DETECTION = 'Y';
+const char PHASER_COMMAND = 'z';
+const char PHOTON_COMMAND = 'x';
+
+//Commands
+const char START_MODE = 'S';
+const char STOP_MODE = 'P';
+const char DISPLAY_MODE = 'D';
+const char TRANSMIT_THRUST = 'T';
+const char MSG_COMMAND = 'M';
+
+const char MSG_BATTERY_TEMP = '1';
+const char MSG_BATTERY_LVL = '2';
+const char MSG_FUEL_LVL = '3';
+const char MSG_IMAGE_CAPTURE_FREQUENCY = '4';
+const char MSG_TRANSPORT_DISTANCE = '5';
+const char MSG_PIRATE_PROXIMITY = '6';
 
 
 const float SECOND = 1000000.0f;
@@ -140,11 +156,13 @@ unsigned short BatteryTemp = 0;
 unsigned short FuelLevel = 100;
 unsigned short PowerConsumption = 0;
 unsigned short PowerGeneration = 0;
+
+const int PWM_OUTPUT_PIN = 23;
+
 #if ARDUINO_ON
 unsigned short BatteryPin = A15; //Analog Pin A15 on ATMEGA 2560
 unsigned short BatteryTempPin = A14;
 unsigned short IMAGE_CAPTURE_PIN = A13;
-unsigned short TRANSPORT_INPUT_PIN = A12;
 #else
 unsigned short BatteryPin = 82; //Analog Pin A15 on ATMEGA 2560
 unsigned short BatteryTempPin = 83;
@@ -190,6 +208,12 @@ int ImageCaptureFrequency = 0;
 signed int *Samples;
 signed int *Zeros;
 unsigned short SamplingIndex;
+Bool RunningImageCapture = FALSE;
+const char SEND_IMAGE_DATA = 'I';
+const char START_IMAGE_CAPTURE = 'U';
+const char RESPONSE_IMAGE_COMPLETE = 'W';
+const char RESPONSE_IMAGE_DATA = 'P';
+
 
 //Transport Distance
 unsigned short TransportDistance = 0;
@@ -203,6 +227,21 @@ char Response = NULL;
 
 //struct TaskStruct
 typedef struct TaskStruct TCB;
+
+//PirateDetection
+int PirateProximity = 10000;
+
+//PirateManagement
+int PhasorCount = 0;
+int PhotonCount = 0;
+
+//Command Task
+String CommandBuffer = "";
+String CommandInput = "";
+
+Bool SchedulerState = FALSE;
+Bool DisplayState = TRUE;
+Bool ForceUpdateDisplay = FALSE;
 
 struct TaskStruct {
     void (*task)(void *);
@@ -225,6 +264,10 @@ TCB consoleKeypadTCB;
 TCB vehicalComsTCB;
 TCB imageCaptureTCB;
 TCB transportDistanceTCB;
+TCB CommandManagementTCB;
+TCB pirateDetectionSubsystemTCB;
+TCB pirateDiscouragementSubsystemTCB;
+
 
 struct PowerSubsystemDataStruct {
     Bool *solarPanelState;
@@ -319,6 +362,7 @@ struct ImageCaptureDataStruct {
     signed int *zeros;
     unsigned short *sampleIndex;
     signed int *buffer;
+    Bool *running;
 };
 typedef struct ImageCaptureDataStruct ImageCaptureData;
 
@@ -326,6 +370,24 @@ struct TransportDistanceStruct {
     unsigned short *transportDistance;
 };
 typedef struct TransportDistanceStruct TransportDistanceData;
+
+struct CommandManagementDataStruct {
+
+};
+typedef struct CommandManagementDataStruct CommandManagementData;
+
+struct PirateDetectionSubsystemDataStruct {
+    int *pirateProximityRaw;
+    int *pirateProximityConverted;
+};
+typedef struct PirateDetectionSubsystemDataStruct PirateDetectionSubsystemData;
+
+struct PirateDiscouragementSubsystemDataStruct {
+    int *pirateProximity;
+    int *phasorCount;
+    int *photonCount;
+};
+typedef struct PirateDiscouragementSubsystemDataStruct PirateDiscouragementSubsystemData;
 
 
 //Controls the execution of the power subsystem
@@ -362,6 +424,15 @@ void imageCaptureTask(void *imageCaptureData);
 //Controls the execution of the TransportDistance task
 void transportDistanceTask(void *transportDistanceData);
 
+//Controls validation of commands
+void commandManagementTask(void *commandManagementData);
+
+//Detects and measures distance of unknown objects
+void pirateDetectionSubsystemTask(void *pirateDetectionSubsystemData);
+
+//Manages response to alien object
+void pirateDiscouragementSubsystemTask(void *pirateDiscouragementSubsystemData);
+
 //Returns a random integer between low and high inclusively
 int randomInteger(int low, int high);
 
@@ -374,11 +445,7 @@ void print(String str, int color, int line);
 //Starts up the system by creating all the objects that are needed to run the system
 void setupSystem();
 
-//Process earth input
-void processesEarthInput(char in);
-
-//Process mining input
-void processesMiningInput(char in);
+void processInput(char in);
 
 //Prints timing information for a function based on its last runtime
 void printTaskTiming(char taskName[], unsigned long lastRunTime);
@@ -404,10 +471,12 @@ unsigned short unsignedShortMin(long a, long b) {
 
 #if ARDUINO_ON
 
+#include <SoftwareSerial.h>
+
 //Arduino setup function
 void setup(void) {
-    Serial.begin(115200); //Sets baud rate to 9600
-    Serial1.begin(115200);
+    Serial.begin(57600); //Sets baud rate to 57600
+    Serial1.begin(57600);
 
     pinMode(PWM_OUTPUT_PIN, OUTPUT); //SETUP PWM OUTPUT SIGNAL
 
@@ -709,6 +778,7 @@ void setupSystem() {
     imageCaptureData.zeros = Zeros;
     imageCaptureData.sampleIndex = &SamplingIndex;
     imageCaptureData.buffer = malloc(16 * sizeof *imageCaptureData.buffer);
+    imageCaptureData.running = &RunningImageCapture;
 
     imageCaptureTCB.taskDataPtr = (void *) &imageCaptureData;
     imageCaptureTCB.task = &imageCaptureTask;
@@ -727,6 +797,29 @@ void setupSystem() {
     transportDistanceTCB.prev = NULL;
     transportDistanceTCB.priority = 1;
 
+    PirateDetectionSubsystemData pirateDetectionSubsystemData;
+    pirateDetectionSubsystemData.pirateProximityRaw = &ImageCaptureFrequency;
+    pirateDetectionSubsystemData.pirateProximityConverted = &PirateProximity;
+    pirateDetectionSubsystemTCB.taskDataPtr = (void *) &pirateDetectionSubsystemData;
+    pirateDetectionSubsystemTCB.task = &pirateDetectionSubsystemTask;
+    pirateDetectionSubsystemTCB.next = NULL;
+    pirateDetectionSubsystemTCB.prev = NULL;
+    pirateDetectionSubsystemTCB.priority = 1;
+
+
+    PirateDiscouragementSubsystemData pirateDiscouragementSubsystemData;
+    pirateDiscouragementSubsystemData.pirateProximity = &PirateProximity;
+    pirateDiscouragementSubsystemData.phasorCount = &PhasorCount;
+    pirateDiscouragementSubsystemData.photonCount = &PhotonCount;
+    pirateDiscouragementSubsystemTCB.taskDataPtr = (void *) &pirateDiscouragementSubsystemData;
+    pirateDiscouragementSubsystemTCB.task = &pirateDiscouragementSubsystemTask;
+    pirateDiscouragementSubsystemTCB.next = NULL;
+    pirateDiscouragementSubsystemTCB.prev = NULL;
+    pirateDiscouragementSubsystemTCB.priority = 2;
+
+    CommandManagementData commandManagementData;
+
+
 
     //Starts the schedule looping
     scheduleTask();
@@ -737,28 +830,29 @@ void scheduleTask() {
     TCB *cur = head;
     while (1) { //Loop forever
         if (NULL != head) {
-            cur->task(cur->taskDataPtr);
-            TCB *next = cur->prev->next;
-            if (next != cur) {
-                cur = next; //This happens when a task removes itself from the list
-            } else {
-                cur = cur->next; //This happens with the natural progression of the queue
+            if (SchedulerState) {
+                cur->task(cur->taskDataPtr);
+                TCB *next = cur->prev->next;
+                if (next != cur) {
+                    cur = next; //This happens when a task removes itself from the list
+                } else {
+                    cur = cur->next; //This happens with the natural progression of the queue
+                }
             }
 #if ARDUINO_ON
             while (Serial.available() > 0) {
-                char input = Serial.read();
-                processesEarthInput(input);
-            }
-            while (Serial1.available() > 0) {
-                processesMiningInput(Serial1.read());
+                processInput(Serial.read());
             }
 
+            while (Serial1.available() > 0) {
+                processInput(Serial1.read());
+            }
 #endif
         }
     }
 }
 
-void processesEarthInput(char in) {
+void processInput(char in) {
     if (INC_CHAR == in) {
         LAST_SOLAR_PANEL_CONTROL_CHAR = in;
     } else if (DEC_CHAR == in) {
@@ -780,16 +874,6 @@ void processesEarthInput(char in) {
     } else if (ACKNOWLEDGEOVERTEMP_CHAR == in) {
         AcknowledgeOverTemp = TRUE;
     } else if (REQUEST_TRANSPORT == in) {
-        Serial1.print(REQUEST_TRANSPORT);
-    } else if (REQUEST_DOCK == in) {
-        Serial1.print(REQUEST_DOCK);
-    }
-}
-
-void processesMiningInput(char in) {
-    if (RESPONSE_END == in) {
-        Serial.println(in);
-    } else if (REQUEST_TRANSPORT == in) {
         if (!contains(&transportDistanceTCB)) {
             Serial.println("Starting lift off!");
             Serial1.print(OK_LIFT_OFF);
@@ -801,8 +885,52 @@ void processesMiningInput(char in) {
             Serial.println("Transport Complete!");
             removeNode(&transportDistanceTCB);
         }
-    } else {
-        Serial.print(in);
+    } else if (PIRATE_DETECTION == in) {
+        if (!contains(&pirateDetectionSubsystemTCB)) {
+            Serial.println("Pirate Detected!");
+            insertNode(&pirateDetectionSubsystemTCB);
+        }
+    } else if (PHASER_COMMAND == in) {
+        if (contains(&pirateDetectionSubsystemTCB) && PirateProximity <= 30) {
+            PhasorCount++;
+        }
+    } else if (PHOTON_COMMAND == in) {
+        if (contains(&pirateDetectionSubsystemTCB) && PirateProximity <= 5) {
+            PhotonCount++;
+        }
+    } else if (START_MODE == in) {
+        SchedulerState = TRUE;
+    } else if (STOP_MODE == in) {
+        SchedulerState = FALSE;
+    } else if (DISPLAY_MODE == in) {
+        DisplayState = !DisplayState;
+        if (!DisplayState) {
+            tft.fillScreen(NONE);
+        } else {
+            ForceUpdateDisplay = TRUE;
+        }
+    } else if (SEND_IMAGE_DATA == in) {
+        Serial1.print("P<");
+        Serial1.print(ImageCaptureFrequency);
+        Serial1.println(">");
+        RunningImageCapture = FALSE;
+    } else if (START_IMAGE_CAPTURE == in) {
+        RunningImageCapture = TRUE;
+    } else if (MSG_COMMAND == in || TRANSMIT_THRUST == in) {
+        CommandBuffer += in;
+        while (Serial1.available()) {
+            char next = Serial1.read();
+            if ('\n' != next) {
+                CommandBuffer += next;
+            } else {
+                CommandInput = CommandBuffer;
+                CommandBuffer = "";
+                if (!contains(&CommandManagementTCB)) {
+                    insertNode(&CommandManagementTCB);
+                }
+                break;
+            }
+        }
     }
 }
 
@@ -1185,7 +1313,7 @@ void warningAlarmTask(void *warningAlarmData) {
                 print("FUEL: " + (String) * data->fuelLevel + " ", fuelColor, 0);
                 hideFuelTime = systemTime() + fuelDelay;
             }
-        } else if (fuelStatus != GREEN) {
+        } else if (fuelStatus != GREEN || ForceUpdateDisplay) {
             print("FUEL: " + (String) * data->fuelLevel + " ", GREEN, 0);
             fuelStatus = GREEN;
         }
@@ -1214,9 +1342,13 @@ void warningAlarmTask(void *warningAlarmData) {
                 print("BATTERY: " + (String) * data->batteryLevel + " ", batteryColor, 1);
                 hideBatteryTime = systemTime() + batteryDelay;
             }
-        } else if (batteryStatus != GREEN) {
+        } else if (batteryStatus != GREEN || ForceUpdateDisplay) {
             print("BATTERY: " + (String) * data->batteryLevel + " ", GREEN, 1);
             batteryStatus = GREEN;
+        }
+        
+        if(ForceUpdateDisplay) {
+            ForceUpdateDisplay = FALSE;
         }
 
         //DISPLAYS BATTERY TEMP
@@ -1379,7 +1511,7 @@ void imageCaptureTask(void *imageCaptureData) {
         }
         signed int maxFrequency = 8192 * optfft(data->samples, data->zeros) / IMAGE_CAPTURE_SAMPLES;
 
-        if (!contains(&transportDistanceTCB)) {
+        if (!contains(&transportDistanceTCB) && !contains(&pirateDetectionSubsystemTCB) && *data->running) {
             Serial.print("Image Frequency: ");
             Serial.println(maxFrequency);
         }
@@ -1396,21 +1528,78 @@ void transportDistanceTask(void *transportDistanceData) {
     static unsigned long nextRunTime = 0;
     if (nextRunTime == 0 || systemTime() >= nextRunTime) {
         nextRunTime = systemTime() + SECOND;
-        float distance = (float)ImageCaptureFrequency/ 1.75f;
+        float distance = (float) ImageCaptureFrequency / 1.75f;
 
         *data->transportDistance = (unsigned short) distance;
         Serial.print("Transport Distance: ");
-        if(distance < 100) {
+        if (distance < 100) {
             Serial.print("<100");
-        } else if(distance > 2000) {
-            Serial.print(">3500");
+        } else if (distance > 2000) {
+            Serial.print(">2000");
         } else {
             Serial.print(distance);
         }
         Serial.println("m");
     }
 #endif
+}
 
+//Controls validation of commands
+void commandManagementTask(void *commandManagementData) {
+    CommandManagementData *data = (CommandManagementData *) commandManagementData;
+
+}
+
+//Detects and measures distance of unknown objects
+void pirateDetectionSubsystemTask(void *pirateDetectionSubsystemData) {
+    PirateDetectionSubsystemData *data = (PirateDetectionSubsystemData *) pirateDetectionSubsystemData;
+    static unsigned long nextRunTime = 0;
+    if (nextRunTime == 0 || systemTime() >= nextRunTime) {
+        nextRunTime = (unsigned long) (systemTime() + SECOND * 0.5);
+        *data->pirateProximityConverted = (int) (*data->pirateProximityRaw / 20.0);
+#ifdef ARDUINO_ON
+        Serial.print("Alien Distance: ");
+        Serial.println(*data->pirateProximityConverted);
+#endif
+        if (*data->pirateProximityConverted < 100) {
+            if (!contains(&pirateDiscouragementSubsystemTCB)) {
+                insertNode(&pirateDiscouragementSubsystemTCB);
+            }
+        } else {
+            if (contains(&pirateDiscouragementSubsystemTCB)) {
+                removeNode(&pirateDiscouragementSubsystemTCB);
+            }
+        }
+    }
+}
+
+//Manages response to alien object
+void pirateDiscouragementSubsystemTask(void *pirateDiscouragementSubsystemData) {
+    PirateDiscouragementSubsystemData *data = (PirateDiscouragementSubsystemData *) pirateDiscouragementSubsystemData;
+    static unsigned long nextRunTime = 0;
+    static Bool didJustPrint = FALSE;
+    if (nextRunTime == 0 || systemTime() >= nextRunTime) {
+        nextRunTime = (unsigned long) (systemTime() + SECOND * 0.1);
+        if (didJustPrint) {
+            print("PHASER", NONE, 6);
+            print("PHOTON", NONE, 7);
+            didJustPrint = FALSE;
+        }
+        if (*data->pirateProximity <= 30) {
+            if (*data->phasorCount > 0) {
+                print("PHASER", RED, 6);
+                *data->phasorCount -= 1;
+                didJustPrint = TRUE;
+            }
+            if (*data->pirateProximity <= 5) {
+                if (*data->photonCount > 0) {
+                    print("PHOTON", RED, 7);
+                    *data->photonCount -= 1;
+                    didJustPrint = TRUE;
+                }
+            }
+        }
+    }
 }
 
 //Returns a random integer between low and high inclusively
@@ -1435,6 +1624,9 @@ int randomInteger(int low, int high) {
 //Prints a string to the tft given text, the length of the text, a color, and a line number
 void print(String str, int color, int line) {
     //To flash the selected line, you must print exact same string black then recolor
+    if (!DisplayState) {
+        color = NONE;
+    }
 #if ARDUINO_ON
     tft.setTextColor(color, NONE);
     tft.setCursor(0, line * 16);
