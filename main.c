@@ -131,7 +131,7 @@ const char MSG_PIRATE_PROXIMITY = '6';
 
 const float SECOND = 1000000.0f;
 const float PWM_COUNTER_PERIOD = SECOND / 4.0f;
-unsigned long runDelay = 5000000; //5 Sec
+const unsigned long RUN_DELAY = 5000000; //5 Sec
 #define DEPLOY_RETRACT_TIME SECOND*10
 const float DEFAULT_DUTY_CYCLE = 0.5f;
 const float PWM_PERIOD = SECOND / 2.0f;
@@ -215,6 +215,7 @@ const char RESPONSE_IMAGE_COMPLETE = 'W';
 const char RESPONSE_IMAGE_DATA = 'P';
 
 
+static const int OVER_TEMPATURE_CONST = 180;
 //Transport Distance
 unsigned short TransportDistance = 0;
 
@@ -264,7 +265,7 @@ TCB consoleKeypadTCB;
 TCB vehicalComsTCB;
 TCB imageCaptureTCB;
 TCB transportDistanceTCB;
-TCB CommandManagementTCB;
+TCB commandManagementTCB;
 TCB pirateDetectionSubsystemTCB;
 TCB pirateDiscouragementSubsystemTCB;
 
@@ -319,6 +320,10 @@ struct SatelliteComsDataStruct {
     unsigned short *powerGeneration;
     unsigned int *thrusterControl;
     unsigned short *batteryTemp;
+    int *imageCaptureFrequency;
+    unsigned short *transportDistance;
+    Bool *batteryOverTemp;
+
 };
 typedef struct SatelliteComsDataStruct SatelliteComsData;
 
@@ -372,7 +377,14 @@ struct TransportDistanceStruct {
 typedef struct TransportDistanceStruct TransportDistanceData;
 
 struct CommandManagementDataStruct {
-
+    unsigned short *batteryTemp;
+    unsigned short *batteryLevel;
+    unsigned short *fuelLevel;
+    int *imageCaptureFrequency;
+    unsigned short *transportDistance;
+    int *pirateProximity;
+    unsigned int *thrusterControl;
+    String *command;
 };
 typedef struct CommandManagementDataStruct CommandManagementData;
 
@@ -452,6 +464,10 @@ void printTaskTiming(char taskName[], unsigned long lastRunTime);
 
 //Returns the current system time in milliseconds
 unsigned long systemTime();
+
+void processMSG(char subtype, CommandManagementData *data);
+
+void processThrust(String thrustCommand, CommandManagementData *data);
 
 unsigned short unsignedShortMax(long a, long b) {
 #if !ARDUINO_ON
@@ -692,6 +708,12 @@ void setupSystem() {
     satelliteComsData.solarPanelState = &SolarPanelState;
     satelliteComsData.batteryLow = &BatteryLow;
     satelliteComsData.fuelLow = &FuelLow;
+    satelliteComsData.imageCaptureFrequency = &ImageCaptureFrequency;
+    satelliteComsData.transportDistance = &TransportDistance;
+    satelliteComsData.batteryTemp = &BatteryTemp;
+    satelliteComsData.batteryOverTemp = &BatteryOverTemp;
+    satelliteComsData.batteryRapidTemp = &BatteryRapidTemp;
+
 
     satelliteComsTCB.taskDataPtr = (void *) &satelliteComsData;
     satelliteComsTCB.task = &satelliteComsTask;
@@ -818,7 +840,19 @@ void setupSystem() {
     pirateDiscouragementSubsystemTCB.priority = 2;
 
     CommandManagementData commandManagementData;
-
+    commandManagementData.pirateProximity = &PirateProximity;
+    commandManagementData.transportDistance = &TransportDistance;
+    commandManagementData.imageCaptureFrequency = &ImageCaptureFrequency;
+    commandManagementData.batteryLevel = &BatteryLevel;
+    commandManagementData.fuelLevel = &FuelLevel;
+    commandManagementData.batteryTemp = &BatteryTemp;
+    commandManagementData.command = &CommandInput;
+    commandManagementData.thrusterControl = &ThrusterControl;
+    commandManagementTCB.taskDataPtr = (void *) &commandManagementData;
+    commandManagementTCB.task = &commandManagementTask;
+    commandManagementTCB.next = NULL;
+    commandManagementTCB.prev = NULL;
+    commandManagementTCB.priority = 1;
 
 
     //Starts the schedule looping
@@ -872,6 +906,7 @@ void processInput(char in) {
     } else if (DRILL_STOP_CHAR == in) {
         LAST_VEHICLE_COMM = in;
     } else if (ACKNOWLEDGEOVERTEMP_CHAR == in) {
+        Serial.println("Acknowledge Over Temp");
         AcknowledgeOverTemp = TRUE;
     } else if (REQUEST_TRANSPORT == in) {
         if (!contains(&transportDistanceTCB)) {
@@ -910,10 +945,13 @@ void processInput(char in) {
             ForceUpdateDisplay = TRUE;
         }
     } else if (SEND_IMAGE_DATA == in) {
-        Serial1.print("P<");
-        Serial1.print(ImageCaptureFrequency);
-        Serial1.println(">");
-        RunningImageCapture = FALSE;
+        if (RunningImageCapture) {
+            Serial1.println("W");
+            Serial1.print("P<");
+            Serial1.print(ImageCaptureFrequency);
+            Serial1.println(">");
+            RunningImageCapture = FALSE;
+        }
     } else if (START_IMAGE_CAPTURE == in) {
         RunningImageCapture = TRUE;
     } else if (MSG_COMMAND == in || TRANSMIT_THRUST == in) {
@@ -925,8 +963,10 @@ void processInput(char in) {
             } else {
                 CommandInput = CommandBuffer;
                 CommandBuffer = "";
-                if (!contains(&CommandManagementTCB)) {
-                    insertNode(&CommandManagementTCB);
+                Serial.print("Command: ");
+                Serial.println(CommandInput);
+                if (!contains(&commandManagementTCB)) {
+                    insertNode(&commandManagementTCB);
                 }
                 break;
             }
@@ -1031,7 +1071,7 @@ void powerSubsystemTask(void *powerSubsystemData) {
             batteryRead(data);
         }
 
-        nextExecutionTime = systemTime() + runDelay;
+        nextExecutionTime = systemTime() + RUN_DELAY;
         executionCount++;
     }
     // if (batteryInitialTempRead && systemTime() >= readBatteryTempExecutionTime) {
@@ -1069,7 +1109,7 @@ void batteryTempRead(PowerSubsystemData *data) {
     }
 
     if ((0 != *data->batteryTempIndex) && (BatteryTempArray[*data->batteryTempIndex] > 0) &&
-        (BatteryTempArray[*data->batteryTempIndex] > 180) &&
+        (BatteryTempArray[*data->batteryTempIndex] > OVER_TEMPATURE_CONST) &&
         (BatteryTempArray[*data->batteryTempIndex] != BatteryTempArray[*data->batteryTempIndex - 1])) {
         *data->batteryOverTemp = TRUE;
         *data->acknowledgeOverTemp = FALSE;
@@ -1079,7 +1119,7 @@ void batteryTempRead(PowerSubsystemData *data) {
         *data->acknowledgeOverTemp = FALSE;
         *data->alarmCount = 0;
     } else if ((0 != *data->batteryTempIndex) && (BatteryTempArray[*data->batteryTempIndex] > 0) &&
-               (BatteryTempArray[*data->batteryTempIndex] < 180)) {
+               (BatteryTempArray[*data->batteryTempIndex] < OVER_TEMPATURE_CONST)) {
         *data->batteryOverTemp = FALSE;
         *data->acknowledgeOverTemp = FALSE;
         *data->alarmCount = 0;
@@ -1131,6 +1171,13 @@ void thrusterSubsystemTask(void *thrusterSubsystemData) {
         unsigned int magnitude = (signal & (0xF0)) >> 4; // Get the 5-7th bit and shift if back down
         unsigned int duration = (signal & (0xFF00)) >> 8;
 
+        Serial.print("Direction: ");
+        Serial.println(direction);
+        Serial.print("Magnitude: ");
+        Serial.println(magnitude);
+        Serial.print("Duration: ");
+        Serial.println(duration);
+
         //Debug print info
 #if !ARDUINO_ON && DEBUG
         printf("\t\tDirection %d\n", direction);
@@ -1150,7 +1197,7 @@ void thrusterSubsystemTask(void *thrusterSubsystemData) {
         }
 
 
-        nextExecutionTime = systemTime() + runDelay;
+        nextExecutionTime = systemTime() + RUN_DELAY;
     }
 
 }
@@ -1175,27 +1222,50 @@ unsigned int getRandomThrustSignal() {
 void satelliteComsTask(void *satelliteComsData) {
     static unsigned long nextExecutionTime = 0;
     static unsigned long lastExecutionTime = 0;
-    if (nextExecutionTime == 0 || nextExecutionTime < systemTime()) {
+    static unsigned int printer = 0;
+    if (nextExecutionTime == 0 || nextExecutionTime < systemTime() || printer != 0) {
 #if !ARDUINO_ON && DEBUG
         printf("satelliteComsTask\n");
 #endif
         printTaskTiming("satelliteComsTask", lastExecutionTime);
         lastExecutionTime = systemTime();
         SatelliteComsData *data = (SatelliteComsData *) satelliteComsData;
+        nextExecutionTime = systemTime() + RUN_DELAY;
 
-        //TODO: In future labs, send the following data:
-        /*
-        * Fuel Low
-        * Battery Low
-        * Solar Panel State
-        * Battery Level
-        * Fuel Level
-        * Power Consumption
-        * Power Generation
-        */
+        if (*data->fuelLow == TRUE) {
+            Serial1.println("Fuel Low!");
+        }
+        if (*data->batteryLow == TRUE) {
+            Serial1.println("Battery Low!");
+        }
+        if (0 == printer) {
+            printer += 1;
+            Serial1.print("Solar Panel State: ");
+            Serial1.println((*data->solarPanelState ? " ON" : "OFF"));
+            Serial1.print("Battery Level: ");
+            Serial1.println(*data->batteryLevel);
+            Serial1.print("Battery Temp: ");
+            Serial1.println(*data->batteryTemp);
+        } else if (1 == printer) {
+            printer +=1;
+            Serial1.print("Battery Rapid Temp: ");
+            Serial1.println(*data->batteryRapidTemp ? " TRUE" : "FALSE");
+            Serial1.print("Battery Over Temp: ");
+            Serial1.println(*data->batteryOverTemp ? "TRUE" : "FALSE");
+            Serial1.print("Fuel Level: ");
+            Serial1.println(*data->fuelLevel);
+            Serial1.print("Power Consumption: ");
+            Serial1.println(*data->powerConsumption);
 
-        *(data->thrusterControl) = getRandomThrustSignal();
-        nextExecutionTime = systemTime() + runDelay;
+        } else {
+            Serial1.print("Power Generation: ");
+            Serial1.println(*data->powerGeneration);
+            Serial1.print("Image Capture Frequency: ");
+            Serial1.println(*data->imageCaptureFrequency);
+            Serial1.print("Transport Distance: ");
+            Serial1.println(*data->transportDistance);
+            printer = 0;
+        }
     }
 }
 
@@ -1235,10 +1305,6 @@ void consoleDisplayTask(void *consoleDisplayData) {
             Serial.println(*data->powerConsumption);
             Serial.print("\tPower Generation: ");
             Serial.println(*data->powerGeneration);
-            Serial.println();
-            Serial.print("\tPower Generation: ");
-            Serial.println(*data->powerGeneration);
-            Serial.println();
 #elif 0
             printf("\tSolar Panel State: ");
             printf((*data->solarPanelState ? " ON" : "OFF"));
@@ -1268,7 +1334,7 @@ void consoleDisplayTask(void *consoleDisplayData) {
 #else
         }
 #endif
-        nextExecutionTime = systemTime() + runDelay;
+        nextExecutionTime = systemTime() + RUN_DELAY;
     }
 }
 
@@ -1347,7 +1413,7 @@ void warningAlarmTask(void *warningAlarmData) {
             batteryStatus = GREEN;
         }
 
-        if(ForceUpdateDisplay) {
+        if (ForceUpdateDisplay) {
             ForceUpdateDisplay = FALSE;
         }
 
@@ -1487,8 +1553,9 @@ void vehicleCommsTask(void *vehicleCommsData) {
     static char lastProcessedInput = NO_VEHICLE_COMMAND;
 #if ARDUINO_ON
     if (lastProcessedInput != LAST_VEHICLE_COMM) {
+        Serial1.print("A<");
         Serial1.print(LAST_VEHICLE_COMM);
-
+        Serial1.println(">");
         lastProcessedInput = LAST_VEHICLE_COMM;
     }
 #endif
@@ -1547,7 +1614,46 @@ void transportDistanceTask(void *transportDistanceData) {
 //Controls validation of commands
 void commandManagementTask(void *commandManagementData) {
     CommandManagementData *data = (CommandManagementData *) commandManagementData;
+    char type = (*data->command).charAt(0);
+    switch (type) {
+        case MSG_COMMAND:
+            processMSG((*data->command).charAt(1), data);
+            break;
+        case TRANSMIT_THRUST:
+            processThrust((*data->command).substring(1), data);
+            break;
+        default:
+            break;//Do nothing
+    }
+    removeNode(&commandManagementTCB);
+}
 
+void processMSG(char subtype, CommandManagementData *data) {
+    if(MSG_BATTERY_TEMP == subtype) {
+        Serial1.print("Battery Temp: ");
+        Serial1.println(*data->batteryTemp);
+    } else if(MSG_BATTERY_LVL == subtype) {
+        Serial1.print("Battery Level: ");
+        Serial1.println(*data->batteryLevel);
+    } else if(MSG_FUEL_LVL == subtype) {
+        Serial1.print("Fuel Level: ");
+        Serial1.println(*data->fuelLevel);
+    } else if(MSG_IMAGE_CAPTURE_FREQUENCY == subtype) {
+        Serial1.print("Image Capture Frequency: ");
+        Serial1.println(*data->imageCaptureFrequency);
+    } else if(MSG_TRANSPORT_DISTANCE == subtype) {
+        Serial1.print("Transport Distance: ");
+        Serial1.println(*data->transportDistance);
+    } else if(MSG_PIRATE_PROXIMITY == subtype) {
+        Serial1.print("Pirate Proximity: ");
+        Serial1.println(*data->pirateProximity);
+    }
+}
+
+void processThrust(String thrustCommand, CommandManagementData *data) {
+    Serial.print("New Command: ");
+    Serial.println(thrustCommand.toInt());
+    *data->thrusterControl = (unsigned int) thrustCommand.toInt();
 }
 
 //Detects and measures distance of unknown objects
@@ -1566,6 +1672,9 @@ void pirateDetectionSubsystemTask(void *pirateDetectionSubsystemData) {
                 insertNode(&pirateDiscouragementSubsystemTCB);
             }
         } else {
+            if (contains(&pirateDiscouragementSubsystemTCB)) {
+                removeNode(&pirateDiscouragementSubsystemTCB);
+            }
             if (contains(&pirateDiscouragementSubsystemTCB)) {
                 removeNode(&pirateDiscouragementSubsystemTCB);
             }
@@ -1639,7 +1748,7 @@ void print(String str, int color, int line) {
 
 //Starts up the system by creating all the objects that are needed to run the system
 void printTaskTiming(char taskName[], unsigned long lastRunTime) {
-#if ARDUINO_ON
+#if ARDUINO_ON && 0
     if (shouldPrintTaskTiming) {
         Serial.print(taskName);
         Serial.print(" - cycle delay: ");

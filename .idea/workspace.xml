@@ -12,9 +12,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ae62b93f-036e-4be3-9365-ed6d665597cf" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/EE474-Lab5.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/EE474-Lab5.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/arduino_sketch/arduino_sketch.ino" beforeDir="false" afterPath="$PROJECT_DIR$/arduino_sketch/arduino_sketch.ino" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.c" beforeDir="false" afterPath="$PROJECT_DIR$/main.c" afterDir="false" />
     </list>
@@ -46,12 +43,12 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="c" value="3001" />
+          <entry key="c" value="4288" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="ObjectiveC" value="3001" />
+          <entry key="ObjectiveC" value="4288" />
         </counts>
       </usages-collector>
     </session>
@@ -61,27 +58,28 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.c">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="508">
-              <caret line="909" column="38" lean-forward="true" selection-start-line="909" selection-start-column="38" selection-end-line="909" selection-end-column="38" />
+            <state relative-caret-position="435">
+              <caret line="1624" column="16" lean-forward="true" selection-start-line="1624" selection-start-column="16" selection-end-line="1624" selection-end-column="16" />
               <folding>
                 <element signature="e#383#437#0" expanded="true" />
                 <element signature="e#447#503#0" expanded="true" />
                 <element signature="e#2223#2289#0" expanded="true" />
                 <element signature="e#4129#4228#0" expanded="true" />
-                <element signature="e#11919#11954#0" expanded="true" />
-                <element signature="e#12063#12098#0" expanded="true" />
-                <element signature="e#12585#12651#0" expanded="true" />
-                <element signature="e#14604#14637#0" expanded="true" />
-                <element signature="e#28879#28910#0" expanded="true" />
-                <element signature="e#32653#32679#0" expanded="true" />
+                <element signature="e#12905#12940#0" expanded="true" />
+                <element signature="e#13049#13084#0" expanded="true" />
+                <element signature="e#13493#13559#0" expanded="true" />
+                <element signature="e#15512#15545#0" expanded="true" />
+                <element signature="e#31241#31272#0" expanded="true" />
+                <element signature="e#34827#34853#0" expanded="true" />
                 <element signature="e#34543#34569#0" expanded="true" />
                 <element signature="e#34714#34794#0" expanded="true" />
                 <element signature="e#34811#34849#0" expanded="true" />
                 <element signature="e#35168#35202#0" expanded="true" />
-                <element signature="e#35820#35999#0" expanded="true" />
-                <element signature="e#37454#37484#0" expanded="true" />
-                <element signature="e#41739#41740#0" expanded="true" />
+                <element signature="e#38147#38326#0" expanded="true" />
+                <element signature="e#40527#40557#0" expanded="true" />
+                <element signature="e#44786#44787#0" expanded="true" />
                 <element signature="e#54374#54444#0" expanded="true" />
+                <element signature="e#60051#60335#0" expanded="true" />
                 <element signature="e#55046#55090#0" expanded="true" />
               </folding>
             </state>
@@ -92,21 +90,10 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>transportd</find>
-      <find>transportdi</find>
-      <find>print(</find>
-      <find>'P'</find>
-      <find>TCB</find>
-      <find>PIN</find>
-      <find>TRANSPORT_INPUT_PIN</find>
-      <find>imagep</find>
-      <find>alien di</find>
-      <find>setup()</find>
       <find>schedulet</find>
       <find>processesMiningInput</find>
       <find>outputToEarth</find>
       <find>processEarthInput</find>
-      <find>sat</find>
       <find>start_im</find>
       <find>scheduletask</find>
       <find>setup(v</find>
@@ -114,7 +101,29 @@
       <find>imagecaptureTCB</find>
       <find>warning</find>
       <find>warningalarmta</find>
+      <find>pirate</find>
+      <find>commandmanagementtask</find>
+      <find>'1'</find>
+      <find>processMSG</find>
+      <find>thrustercontrol</find>
+      <find>random</find>
+      <find>processTr</find>
+      <find>PWM</find>
+      <find>overtem</find>
+      <find>satellitecomsta</find>
+      <find>Serial.print(&quot;\tSolar Panel State: &quot;);</find>
+      <find>commandman</find>
+      <find>batteryover</find>
+      <find>BatteryRapidTemp</find>
+      <find>micro</find>
+      <find>\t</find>
+      <find>sat</find>
+      <find>Serial1.print</find>
+      <find>running ta</find>
     </findStrings>
+    <replaceStrings>
+      <replace />
+    </replaceStrings>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -202,12 +211,12 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1544291643809</updated>
-      <workItem from="1544291646844" duration="10054000" />
+      <workItem from="1544291646844" duration="17138000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="10054000" />
+    <option name="totallyTimeSpent" value="17138000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="34" y="23" width="1400" height="987" extended-state="0" />
@@ -222,7 +231,7 @@
       <window_info anchor="bottom" id="Event Log" side_tool="true" />
       <window_info anchor="bottom" id="CMake" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" weight="0.32960895" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.27486032" />
       <window_info anchor="bottom" id="Run" order="2" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
@@ -243,27 +252,28 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/main.c">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="508">
-          <caret line="909" column="38" lean-forward="true" selection-start-line="909" selection-start-column="38" selection-end-line="909" selection-end-column="38" />
+        <state relative-caret-position="435">
+          <caret line="1624" column="16" lean-forward="true" selection-start-line="1624" selection-start-column="16" selection-end-line="1624" selection-end-column="16" />
           <folding>
             <element signature="e#383#437#0" expanded="true" />
             <element signature="e#447#503#0" expanded="true" />
             <element signature="e#2223#2289#0" expanded="true" />
             <element signature="e#4129#4228#0" expanded="true" />
-            <element signature="e#11919#11954#0" expanded="true" />
-            <element signature="e#12063#12098#0" expanded="true" />
-            <element signature="e#12585#12651#0" expanded="true" />
-            <element signature="e#14604#14637#0" expanded="true" />
-            <element signature="e#28879#28910#0" expanded="true" />
-            <element signature="e#32653#32679#0" expanded="true" />
+            <element signature="e#12905#12940#0" expanded="true" />
+            <element signature="e#13049#13084#0" expanded="true" />
+            <element signature="e#13493#13559#0" expanded="true" />
+            <element signature="e#15512#15545#0" expanded="true" />
+            <element signature="e#31241#31272#0" expanded="true" />
+            <element signature="e#34827#34853#0" expanded="true" />
             <element signature="e#34543#34569#0" expanded="true" />
             <element signature="e#34714#34794#0" expanded="true" />
             <element signature="e#34811#34849#0" expanded="true" />
             <element signature="e#35168#35202#0" expanded="true" />
-            <element signature="e#35820#35999#0" expanded="true" />
-            <element signature="e#37454#37484#0" expanded="true" />
-            <element signature="e#41739#41740#0" expanded="true" />
+            <element signature="e#38147#38326#0" expanded="true" />
+            <element signature="e#40527#40557#0" expanded="true" />
+            <element signature="e#44786#44787#0" expanded="true" />
             <element signature="e#54374#54444#0" expanded="true" />
+            <element signature="e#60051#60335#0" expanded="true" />
             <element signature="e#55046#55090#0" expanded="true" />
           </folding>
         </state>
