@@ -1239,15 +1239,14 @@ void satelliteComsTask(void *satelliteComsData) {
             Serial1.println("Battery Low!");
         }
         if (0 == printer) {
-            printer += 1;
             Serial1.print("Solar Panel State: ");
             Serial1.println((*data->solarPanelState ? " ON" : "OFF"));
             Serial1.print("Battery Level: ");
             Serial1.println(*data->batteryLevel);
             Serial1.print("Battery Temp: ");
             Serial1.println(*data->batteryTemp);
+            printer += 1;
         } else if (1 == printer) {
-            printer +=1;
             Serial1.print("Battery Rapid Temp: ");
             Serial1.println(*data->batteryRapidTemp ? " TRUE" : "FALSE");
             Serial1.print("Battery Over Temp: ");
@@ -1256,6 +1255,7 @@ void satelliteComsTask(void *satelliteComsData) {
             Serial1.println(*data->fuelLevel);
             Serial1.print("Power Consumption: ");
             Serial1.println(*data->powerConsumption);
+            printer +=1;
 
         } else {
             Serial1.print("Power Generation: ");
